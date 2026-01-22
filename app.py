@@ -29,8 +29,9 @@ def get_data() -> list:
     # then sort and return by average sat and then by acceptance rate if i have to
     return sorted(list_of_colleges, key=lambda student: (student.avg_sat, -student.acceptance_rate))
 
-def filter_colleges(list_of_colleges: list, user_sat_score: int, SAT_RANGE_BUFFER: int) -> list:  # originally in get_reccommended_colleges() but this makes it easier to read
+def filter_colleges(list_of_colleges: list, user_sat_score: int) -> list:  # originally in get_reccommended_colleges() but this makes it easier to read
     # filtering colleges by the range the user provides
+    SAT_RANGE_BUFFER = 100
     min_sat = user_sat_score - SAT_RANGE_BUFFER
     max_sat = user_sat_score + SAT_RANGE_BUFFER
     filtered_colleges = [
@@ -38,9 +39,8 @@ def filter_colleges(list_of_colleges: list, user_sat_score: int, SAT_RANGE_BUFFE
         if min_sat <= college.avg_sat <= max_sat
     ]
 
-    # if no colleges are found in that tight range, expand the search slightly
+    # if least 10 are not found in that range, expand the search slightly
     while not filtered_colleges:
-        print(f"no colleges found within {SAT_RANGE_BUFFER} points. expanding search range...")
         SAT_RANGE_BUFFER += 100
         min_sat -= 100
         max_sat += 100
@@ -50,8 +50,8 @@ def filter_colleges(list_of_colleges: list, user_sat_score: int, SAT_RANGE_BUFFE
         ]
     return filtered_colleges
 
-def get_reccommended_colleges(list_of_colleges: list, user_sat_score: int, SAT_RANGE_BUFFER: int) -> list:
-    list_of_colleges = filter_colleges(list_of_colleges, user_sat_score, SAT_RANGE_BUFFER)
+def get_reccommended_colleges(list_of_colleges: list, user_sat_score: int) -> list:
+    list_of_colleges = filter_colleges(list_of_colleges, user_sat_score)
 
     # sort the filtered list using a custom key function
     # the key prioritizes:
@@ -84,8 +84,7 @@ def get_int_input(message: str) -> int:  # uses recursion in a try-except block 
 def main():
     print("welcome to the college finder.\ninput your sat score and i will reccomend you colleges.")
     user_sat_score = get_int_input("what is your sat score?: ")
-    SAT_RANGE_BUFFER = get_int_input("what is your sat range buffer?: ")
-    print_colleges(get_reccommended_colleges(get_data(), user_sat_score, SAT_RANGE_BUFFER))
+    print_colleges(get_reccommended_colleges(get_data(), user_sat_score))
 
 
 if __name__ == "__main__":
