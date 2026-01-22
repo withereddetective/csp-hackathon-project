@@ -41,6 +41,7 @@ def filter_colleges(list_of_colleges: list, user_sat_score: int, SAT_RANGE_BUFFE
     # if no colleges are found in that tight range, expand the search slightly
     while not filtered_colleges:
         print(f"no colleges found within {SAT_RANGE_BUFFER} points. Expanding search range...")
+        SAT_RANGE_BUFFER += 100
         min_sat -= 100
         max_sat += 100
         filtered_colleges = [
