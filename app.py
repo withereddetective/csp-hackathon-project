@@ -40,7 +40,7 @@ def filter_colleges(list_of_colleges: list, user_sat_score: int, SAT_RANGE_BUFFE
 
     # if no colleges are found in that tight range, expand the search slightly
     while not filtered_colleges:
-        print(f"no colleges found within {SAT_RANGE_BUFFER} points. Expanding search range...")
+        print(f"no colleges found within {SAT_RANGE_BUFFER} points. expanding search range...")
         SAT_RANGE_BUFFER += 100
         min_sat -= 100
         max_sat += 100
@@ -61,7 +61,7 @@ def get_reccommended_colleges(list_of_colleges: list, user_sat_score: int, SAT_R
         sat_difference = abs(college.avg_sat - user_sat_score)
         # using a tuple for sorting: (primary_key, secondary_key)
         # python sorts tuples element by element.
-        # we negate acceptance_rate to sort it in descending order (higher rate first).
+        # need to negate acceptance_rate to sort it in descending order (higher rate first).
         return (sat_difference, -college.acceptance_rate)
     
     # sort the list using the custom key
