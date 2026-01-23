@@ -1,36 +1,43 @@
-# 🎓 College Picker
-> A data-driven GUI tool to find the best-fit colleges based on your SAT scores.
+# 🎓 college picker
+> a data-driven gui tool to find the best-fit colleges based on your sat scores.
 
-This tool helps students identify target schools by processing historical college data and ranking them based on score proximity and selectivity, all through an intuitive graphical interface.
+this tool helps students identify target schools by processing historical college data and ranking them based on score proximity and selectivity, all through an intuitive graphical interface.
 
-## 🚀 Features
-- **Smart Filtering:** Uses a custom SAT range buffer to find realistic targets.
-- **Dynamic Sorting:** Ranks colleges by the absolute difference between your score and their average.
-- **Selectivity Tiering:** Secondary sorting by acceptance rate to highlight competitive matches.
-- **Top 10 Picks:** Provides a curated list of the best 10 options in a table.
-- **User-Friendly GUI:** Built with PySide6 for easy input and visualization.
+## 🚀 features
+- **smart filtering:** uses a custom sat range buffer to find realistic targets.
+- **dynamic sorting:** ranks colleges by the absolute difference between your score and their average.
+- **selectivity tiering:** secondary sorting by acceptance rate to highlight competitive matches.
+- **top 10 picks:** provides a curated list of the best 10 options in a table.
+- **college logos:** displays each college's logo fetched from clearbit for visual identification.
+- **user-friendly gui:** built with pyside6 for easy input and visualization.
 
-## 🛠️ How It Works
-1. **Data Loading:** Parses `data.csv` to load institutional statistics.
-2. **Initial Filter:** Applies a default score buffer to narrow down the list.
-3. **Advanced Ranking:**
-   - Primary Sort: `abs(College SAT - User SAT)` (closest match first).
-   - Secondary Sort: Acceptance rate (selectivity preference).
-4. **GUI Display:** Shows the top 10 results in a table with columns for Name, Avg SAT, and Acceptance Rate.
+## 🛠️ how it works
+1. **data loading:** parses `data.csv` to load institutional statistics.
+2. **initial filter:** applies a default score buffer to narrow down the list.
+3. **advanced ranking:**
+   - primary sort: `abs(college sat - user sat)` (closest match first).
+   - secondary sort: acceptance rate (selectivity preference).
+4. **logo fetching:** fetches logos from clearbit api using guessed domains.
+5. **gui display:** shows the top 10 results in a table with logos, names, avg sat, and acceptance rates.
 
-## 📋 Prerequisites
-- Python 3.x
-- PySide6 library
-- A `data.csv` file in the root directory with the following headers:  
-  `College Name, Acceptance Rate, Average SAT`
+## 📋 prerequisites
+- python 3.x
+- pyside6 library
+- requests library
+- a `data.csv` file in the root directory with the following headers:  
+  `college name, acceptance rate, average sat`
+- internet connection (for fetching college logos)
 
-## ⚙️ Installation & Usage
+## ⚙️ installation & usage
 ```bash
-# Install dependencies
-pip install PySide6
+# install dependencies
+pip install pyside6 requests
 
-# Run the application
+# run the application
 python app.py
 ```
 
-The GUI window will open, allowing you to enter your SAT score and view recommendations.
+the gui window will open, allowing you to enter your sat score and view recommendations with college logos.
+
+## 🐛 known issues
+- **logos not appearing:** due to limitations in automatic domain guessing for college websites, some logos may not load. this is a known issue and does not affect the core functionality of college recommendations.
