@@ -49,7 +49,7 @@ def get_college_logo(college_name: str, domain: str = "") -> bytes | None:
     
     # now use the brand fetch api to retrieve the logo
     # brand fetch provides brand assets including logos for domains
-    api_key = "pX6Fb8fPSmowsrnaYqS7wTSPQZPY3Jrkc__eFi9BSZwhxzD2ew-uJ7DrlfZtPG1dEQzdTA5M49Yy1Uy_2X4oMA"
+    api_key = "pX6Fb8fPSmowsrnaYqS7wTSPQZPY3Jrkc__eFi9BSZwhxzD2ew-uJ7DrlfZtPG1dEQzdTA5M49Yy1Uy_2X4oMA"  # replace with your actual api key, this is a demo key
     # construct the api url for the brand data
     url = f"https://api.brandfetch.io/v2/brands/{domain}"
     # set authorization header with bearer token
