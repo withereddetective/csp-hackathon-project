@@ -1,6 +1,8 @@
 import csv  # for reading the csv file
-import sys  # for accessing system-specific parameters and functions
+import sys  # for accessing system specific parameters and functions
 import requests  # for making http requests to fetch logos
+import time  # for adding delays to avoid api rate limits
+import random  # for randomizing delays
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox
@@ -10,74 +12,86 @@ from PySide6.QtCore import Qt, QThreadPool, QObject, Signal  # for threading and
 
 
 """
-START OF COLLEGE LOGO FETCHING CODE USING CLEARBIT API
-THIS IS A SIMPLER ALTERNATIVE TO WIKIPEDIA SCRAPING
-IT STILL ISNT WORKING IDK WHAT IM DOING
+START OF COLLEGE LOGO FETCHING CODE USING BRAND FETCH API
+THIS IS THE WORKING VERSION THAT FETCHES COLLEGE LOGOS
+THIS TOOK ME WAY TOO LONG TO FIGURE OUT BUT IT IS FINALLY WORKING
 """
-known_domains = {
-    "Massachusetts Institute of Technology": "mit.edu",
-    "Stanford University": "stanford.edu",
-    "Harvard University": "harvard.edu",
-    "California Institute of Technology": "caltech.edu",
-    "University of Chicago": "uchicago.edu",
-    "Princeton University": "princeton.edu",
-    "Yale University": "yale.edu",
-    "Columbia University": "columbia.edu",
-    "University of Pennsylvania": "upenn.edu",
-    "Johns Hopkins University": "jhu.edu",
-    "Northwestern University": "northwestern.edu",
-    "Duke University": "duke.edu"
-    # add more later
-}
-def get_college_logo(college_name: str) -> bytes | None:
-    # check known domains first for accuracy
-    if college_name in known_domains:
+known_domains = {}
+def get_college_logo(college_name: str, domain: str = "") -> bytes | None:
+    # determine the domain for the college
+    # first, use provided domain if available
+    if domain:
+        pass
+    # then, check if it's a known college with a predefined domain for accuracy
+    elif college_name in known_domains:
         domain = known_domains[college_name]
     else:
-        # guess the domain by extracting key word and adding .edu
-        # improved domain guessing: handle commas for campus names, clean punctuation
+        # if not known, guess the domain based on the college name
+        # convert to lowercase for processing
         name_lower = college_name.lower()
         if ',' in name_lower:
+            # handle names like "University of California, Berkeley" -> take "Berkeley"
             domain_base = name_lower.split(',')[-1].strip().split()[0]
         elif "university of" in name_lower:
+            # for "University of X", take the last word after "of"
             parts = name_lower.split()
             try:
                 idx = parts.index("of")
-                domain_base = ' '.join(parts[idx + 1:]).split()[-1]  # take the last word after "of"
+                domain_base = ' '.join(parts[idx + 1:]).split()[-1]
             except ValueError:
                 domain_base = parts[0]
         else:
+            # default: take the first word
             domain_base = name_lower.split()[0]
-        # clean domain_base by removing punctuation and keeping only alphanumeric
+        # remove non alphanumeric characters to clean the domain base
         domain_base = ''.join(c for c in domain_base if c.isalnum())
         domain = f"{domain_base}.edu"
     
-    print(f"trying domain: {domain} for {college_name}")  # added debug print to see attempted domains
-    url = f"https://logo.clearbit.com/{domain}"
+    # now use the brand fetch api to retrieve the logo
+    # brand fetch provides brand assets including logos for domains
+    api_key = "pX6Fb8fPSmowsrnaYqS7wTSPQZPY3Jrkc__eFi9BSZwhxzD2ew-uJ7DrlfZtPG1dEQzdTA5M49Yy1Uy_2X4oMA"
+    # construct the api url for the brand data
+    url = f"https://api.brandfetch.io/v2/brands/{domain}"
+    # set authorization header with bearer token
+    headers = {"Authorization": f"Bearer {api_key}"}
     try:
-        r = requests.get(url, timeout=5)
+        # make get request to brand fetch api with timeout
+        r = requests.get(url, headers=headers, timeout=10)
         if r.status_code == 200:
-            return r.content
+            # parse the json response
+            data = r.json()
+            # extract the logos array from the response
+            logos = data.get('logos', [])
+            if logos:
+                # prefer png or svg formats for better quality
+                for logo in logos:
+                    formats = logo.get('formats', [])
+                    for fmt in formats:
+                        if fmt.get('format') in ['png', 'svg']:
+                            logo_url = fmt.get('src')
+                            if logo_url:
+                                # download the logo image
+                                r_logo = requests.get(logo_url, timeout=10)
+                                if r_logo.status_code == 200:
+                                    return r_logo.content
+                # fallback: use the first available format
+                logo_url = logos[0].get('formats', [{}])[0].get('src')
+                if logo_url:
+                    r_logo = requests.get(logo_url, timeout=10)
+                    if r_logo.status_code == 200:
+                        return r_logo.content
+            # if no logos in response
+            print(f"no logos found for {domain}")
         else:
-            print(f"status {r.status_code} for {domain}")  # added to see if 404 or other
-            # try alternative domain if available (e.g., for state universities, try u[state].edu)
-            if "university of" in college_name.lower():
-                parts = college_name.lower().split()
-                if len(parts) > 2:
-                    state = parts[-1]
-                    alt_domain = f"u{state}.edu"
-                    print(f"trying alternative domain: {alt_domain} for {college_name}")
-                    alt_url = f"https://logo.clearbit.com/{alt_domain}"
-                    r_alt = requests.get(alt_url, timeout=5)
-                    if r_alt.status_code == 200:
-                        return r_alt.content
-                    else:
-                        print(f"status {r_alt.status_code} for {alt_domain}")
+            # api returned an error status
+            print(f"brand fetch api status {r.status_code} for {domain}")
     except requests.exceptions.ConnectionError:
-        # no internet or dns issue, skip printing to avoid spam
-        pass
+        # network issue, likely no internet
+        print(f"connection error for brand fetch on {domain}")
+        return b"no_internet"  # special return to indicate no internet
     except Exception as e:
-        print(f"logo fetch error for {college_name}: {e}")
+        # other errors
+        print(f"brand fetch error for {college_name}: {e}")
     return None
 """
 END OF COLLEGE LOGO FETCHING CODE
@@ -87,19 +101,21 @@ END OF COLLEGE LOGO FETCHING CODE
 START OF CODE WRITTEN DURING HACKATHON
 ANY COMMENT THAT STARTS WITH 'ADDED' WAS ADDED AFTER THE HACKATHON
 """
-class College:  # just has 3 values
-    def __init__(self, name: str, acceptance_rate: int, avg_sat: int):
+class College:  # just has 4 values
+    def __init__(self, name: str, acceptance_rate: int, avg_sat: int, domain: str = ""):  # domain added after hackathon
         self.name = name
         self.acceptance_rate = acceptance_rate
         self.avg_sat = avg_sat
+        self.domain = domain  # domain for logo fetching
 
 def get_data() -> list:
     """
     data set from http://github.com/frishberg/US-College-Ranking-Data
-    the data has 3 items per college
+    the data has 4 items per college
     1. name
     2. acceptance rate
     3. average sat
+    4. domain
     """
     list_of_colleges = []  # need this to contain and sort lists
     # added try-except to handle file reading errors and provide graceful exit
@@ -110,12 +126,12 @@ def get_data() -> list:
             next(csv_reader)
             for row in csv_reader:
                 # each 'row' is a list of column values
-                # the magic numbers below are 0 = name, 1 = acceptance rate, 2 = average gpa
-                # added try-except to skip bad rows in csv and continue processing
-                try:
+                # the magic numbers below are 0 = name, 1 = acceptance rate, 2 = average sat, 3 = domain
+                try:  # added try-except to skip bad rows in csv and continue processing
                     list_of_colleges.append(College(str(row[0]), 
                                                     int(row[1]), 
-                                                    int(row[2])))
+                                                    int(row[2]),
+                                                    str(row[3]) if len(row) > 3 else ""))  # domain added after hackathon
                 except (ValueError, IndexError) as e:
                     print(f"skipping bad row in csv: {row} - {e}")
                     continue
@@ -160,7 +176,7 @@ def get_recommended_colleges(list_of_colleges: list, user_sat_score: int) -> lis
     sort the filtered list using a custom key function
     the key prioritizes:
     a) proximity to the users sat score (closer is better, abs(diff) is smaller)
-    b) acceptance Rate (higher acceptance rate is usually safer, so we sort in descending order for secondary sort)
+    b) acceptance rate (higher acceptance rate is usually safer, so we sort in descending order for secondary sort)
     """
     def sorting_key(college):
         sat_difference = abs(college.avg_sat - user_sat_score)
@@ -180,87 +196,117 @@ def get_recommended_colleges(list_of_colleges: list, user_sat_score: int) -> lis
 END OF CODE WRITTEN DURING HACKATHON
 """
 
-class LogoWorker(QObject):
-    finished = Signal(int, bytes)
+class LogoWorker(QObject):  # worker class for fetching logos in background thread to avoid blocking ui
+    finished = Signal(int, bytes)  # signal emitted when logo fetch is complete, passes row index and logo bytes
 
-    def __init__(self, row, college_name):
+    def __init__(self, row, college_name, domain):
         super().__init__()
-        self.row = row
-        self.college_name = college_name
+        self.row = row  # row index in the table
+        self.college_name = college_name  # name of the college to fetch logo for
+        self.domain = domain  # domain for logo fetching
 
     def run(self):
-        logo = get_college_logo(self.college_name)
+        # add random delay to stagger api requests and avoid rate limiting
+        time.sleep(random.uniform(0.5, 2.0))
+        # execute the logo fetching in the background thread
+        logo = get_college_logo(self.college_name, self.domain)
+        # emit signal with row and logo data (or empty bytes if failed)
         self.finished.emit(self.row, logo or b"")
 
-class CollegeFinder(QWidget):  # this is the main window
+class CollegeFinder(QWidget):  # main application window inheriting from QWidget
     def __init__(self):
-        super().__init__()
-        self.threadpool = QThreadPool()  # thread pool for running logo fetching tasks in background
-        self.colleges = get_data()
-        self.setWindowTitle("college finder")
-        font = self.font()
-        font.setPointSize(14)
-        self.setFont(font)
-        layout = QVBoxLayout()
+        super().__init__()  # call parent constructor
+        self.threadpool = QThreadPool()  # QThreadPool manages background threads for logo fetching
+        self.colleges = get_data()  # load college data from csv
+        self.setWindowTitle("college finder")  # set window title
+        font = self.font()  # get default font
+        font.setPointSize(14)  # increase font size for better readability
+        self.setFont(font)  # apply font to the widget
+        layout = QVBoxLayout()  # main vertical layout to arrange widgets top to bottom
 
-        top_layout = QHBoxLayout()
-        self.sat_label = QLabel("what is your sat score?: ")
-        self.sat_input = QLineEdit()
-        self.sat_input.returnPressed.connect(self.find_colleges)
-        self.find_button = QPushButton("find colleges")
-        self.find_button.clicked.connect(self.find_colleges)
+        top_layout = QHBoxLayout()  # horizontal layout for input and button
+        self.sat_label = QLabel("what is your sat score?: ")  # label for sat input
+        self.sat_input = QLineEdit()  # text input for sat score
+        self.sat_input.returnPressed.connect(self.find_colleges)  # connect enter key to search
+        self.find_button = QPushButton("find colleges")  # button to trigger search
+        self.find_button.clicked.connect(self.find_colleges)  # connect button click to search
         top_layout.addWidget(self.sat_label)
         top_layout.addWidget(self.sat_input)
         top_layout.addWidget(self.find_button)
         layout.addLayout(top_layout)
 
-        self.table = QTableWidget()
+        self.table = QTableWidget()  # table to display results
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["logo", "name", "avg sat", "acceptance rate"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.setColumnWidth(0, 100)
-        self.table.setColumnWidth(1, 400)
+        self.table.setColumnWidth(0, 160)  # increased for bigger logos
+        self.table.setColumnWidth(1, 400)  # name column wider for long names
         layout.addWidget(self.table)
 
         self.setLayout(layout)
         self.resize(1000, 600)
 
     def find_colleges(self):
-        # added input validation for sat score
+        # validate user input for sat score
         try:
-            user_sat_score = int(self.sat_input.text())
-            if not 400 <= user_sat_score <= 1600:
-                raise ValueError("SAT score out of range")
+            user_sat_score = int(self.sat_input.text())  # convert input to integer
+            if not 400 <= user_sat_score <= 1600:  # check if within valid sat range
+                raise ValueError("sat score out of range")
         except ValueError:
-            QMessageBox.warning(self, "Invalid Input", "Please enter a valid SAT score between 400 and 1600.")
-            return
+            # show warning dialog if input is invalid
+            QMessageBox.warning(self, "Invalid Input", "Please enter a valid sat score between 400 and 1600.")
+            return  # exit function without proceeding
         
+        # get recommended colleges based on sat score
         recommended = get_recommended_colleges(self.colleges, user_sat_score)
-        self.find_button.setEnabled(False)
-        self.find_button.setText("loading...")
-        self.table.setRowCount(len(recommended))
+        self.find_button.setEnabled(False)  # disable button to prevent multiple clicks
+        self.find_button.setText("loading...")  # update button text to indicate loading
+        self.table.setRowCount(len(recommended))  # set number of rows in table
 
+        # populate table with college data and start logo fetching
         for row, college in enumerate(recommended):
-            self.table.setRowHeight(row, 85)
-            self.table.setItem(row, 1, QTableWidgetItem(college.name))
-            self.table.setItem(row, 2, QTableWidgetItem(str(college.avg_sat)))
-            self.table.setItem(row, 3, QTableWidgetItem(f"{college.acceptance_rate}%"))
-            self.table.setItem(row, 0, QTableWidgetItem("loading…"))
+            self.table.setRowHeight(row, 160)  # set row height for logo display
+            self.table.setItem(row, 1, QTableWidgetItem(college.name))  # college name
+            self.table.setItem(row, 2, QTableWidgetItem(str(college.avg_sat)))  # average sat
+            self.table.setItem(row, 3, QTableWidgetItem(f"{college.acceptance_rate}%"))  # acceptance rate
+            self.table.setItem(row, 0, QTableWidgetItem("loading…"))  # placeholder for logo
 
-            worker = LogoWorker(row, college.name)  # create a worker to fetch logo in a separate thread
-            worker.finished.connect(self.set_logo)  # connect the finished signal to update the table
-            self.threadpool.start(worker.run)  # start the worker in the thread pool
+            # create worker for background logo fetching
+            worker = LogoWorker(row, college.name, college.domain)
+            worker.finished.connect(self.set_logo)  # connect worker's finished signal to set_logo slot
+            self.threadpool.start(worker.run)  # start worker in thread pool
 
+        # re-enable button and reset text after processing
         self.find_button.setEnabled(True)
         self.find_button.setText("find colleges")
 
     def set_logo(self, row, logo_bytes):
         item = QTableWidgetItem()
-        if logo_bytes:
+        if logo_bytes == b"no_internet":
+            # special case: no internet connection
+            item.setText("no internet")
+        elif logo_bytes:
+            # load the image from bytes data
             image = QImage.fromData(logo_bytes)
             if not image.isNull():
-                pixmap = QPixmap.fromImage(image).scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                # calculate scale factor to fit within 160x160 while maximizing size
+                scale_factor = min(160 / image.width(), 160 / image.height())
+                # scale the image
+                pixmap = QPixmap.fromImage(image).scaled(
+                    int(image.width() * scale_factor), 
+                    int(image.height() * scale_factor), 
+                    Qt.KeepAspectRatio, 
+                    Qt.SmoothTransformation
+                )
+                # set the pixmap as an icon in the table item
                 item.setIcon(QIcon(pixmap))
+            else:
+                # image data is invalid
+                item.setText("logo not found")
+        else:
+            # no logo data received
+            item.setText("logo not found")
+        # update the table cell with the item
         self.table.setItem(row, 0, item)
 
 def main():

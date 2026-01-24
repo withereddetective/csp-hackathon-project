@@ -8,7 +8,7 @@ this tool helps students identify target schools by processing historical colleg
 - **dynamic sorting:** ranks colleges by the absolute difference between your score and their average.
 - **selectivity tiering:** secondary sorting by acceptance rate to highlight competitive matches.
 - **top 10 picks:** provides a curated list of the best 10 options in a table.
-- **college logos:** displays each college's logo fetched from clearbit for visual identification.
+- **college logos:** displays each college's logo (scaled to fit within 160x160 pixels while preserving aspect ratio) fetched from brand fetch api for visual identification; shows "logo not found" if unavailable or "no internet" if connection fails.
 - **user-friendly gui:** built with pyside6 for easy input and visualization.
 
 ## 🛠️ how it works
@@ -17,7 +17,7 @@ this tool helps students identify target schools by processing historical colleg
 3. **advanced ranking:**
    - primary sort: `abs(college sat - user sat)` (closest match first).
    - secondary sort: acceptance rate (selectivity preference).
-4. **logo fetching:** fetches logos from clearbit api using guessed domains.
+4. **logo fetching:** fetches logos from brand fetch api using guessed domains.
 5. **gui display:** shows the top 10 results in a table with logos, names, avg sat, and acceptance rates.
 
 ## 📋 prerequisites
@@ -25,7 +25,7 @@ this tool helps students identify target schools by processing historical colleg
 - pyside6 library
 - requests library
 - a `data.csv` file in the root directory with the following headers:  
-  `college name, acceptance rate, average sat`
+  `university name, acceptance rate, average sat, domain`
 - internet connection (for fetching college logos)
 
 ## ⚙️ installation & usage
@@ -40,4 +40,5 @@ python app.py
 the gui window will open, allowing you to enter your sat score and view recommendations with college logos.
 
 ## 🐛 known issues
-- **logos not appearing:** due to limitations in automatic domain guessing for college websites, some logos may not load. this is a known issue and does not affect the core functionality of college recommendations.
+- **logos staying small for some reason**
+- **logos not loading after too many requests made**
