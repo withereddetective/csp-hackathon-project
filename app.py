@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
 )  # for creating gui widgets
 from PySide6.QtCore import Qt, QUrl  # for qt core functionality
 from PySide6.QtGui import QDesktopServices  # for opening urls in browser
+from puter import PuterAI  # for puter ai api calls
 
 
 """
@@ -14,6 +15,64 @@ BUT DUE TO TIME CONSTRAINTS THIS FEATURE WAS NOT IMPLEMENTED.
 ALSO, BRANDFETCH API IS GOING TO SEND A MISSILE TO MY HOUSE.    
 """
 
+"""
+START OF PUTER AI API CODE
+THIS CODE FETCHES COLLEGE DESCRIPTIONS FROM PUTER AI API
+"""
+# cache to store college descriptions to avoid duplicate api calls
+college_descriptions_cache = {}
+
+# global puter ai client (initialized on first use)
+puter_client = None
+
+def initialize_puter_client():
+    """
+    initialize the puter ai client using environment variables.
+    returns the client if successful, none otherwise.
+    """
+    global puter_client
+    
+    if puter_client is not None:
+        return puter_client
+    
+    try:
+        puter_client = PuterAI(username="hackathon_test", password="seguinhs2026")
+        if puter_client.login():
+            return puter_client
+        return None
+    except Exception:
+        return None
+
+def get_college_description(college_name: str) -> str:
+    """
+    fetches a college description from puter ai api.
+    uses caching to avoid duplicate api calls.
+    """
+    # check if description is already cached
+    if college_name in college_descriptions_cache:
+        return college_descriptions_cache[college_name]
+    
+    # initialize puter client
+    client = initialize_puter_client()
+    if client is None:
+        return "error: puter.js credentials not set. set PUTER_USERNAME and PUTER_PASSWORD environment variables."
+    
+    try:
+        # call puter ai to generate college description
+        prompt = f"provide a brief 2-3 sentence description of {college_name} as a college. be concise and informative."
+        description = client.chat(prompt)
+        
+        # cache the description
+        college_descriptions_cache[college_name] = description
+        
+        return description
+    except Exception as e:
+        # return error message if api call fails
+        return f"error fetching description: {str(e)}"
+
+"""
+END OF PUTER AI API CODE
+"""
 
 """
 START OF CODE WRITTEN DURING HACKATHON
@@ -118,31 +177,107 @@ class CollegeFinder(QWidget):  # this be the main window
     def __init__(self):
         super().__init__()                     # call parent constructor
         self.colleges = get_data()             # load college data from csv
-        self.setWindowTitle("college finder")  # set the window title
-        font = self.font()                     # get default font
-        font.setPointSize(14)                  # increase font size for better readability because the default is tiny
-        self.setFont(font)                     # apply font to the widget
-        layout = QVBoxLayout()                 # main vertical layout to arrange widgets top to bottom
+        self.setWindowTitle("college finder")  # set the window title to be shown in the window header
+        font = self.font()                     # get default font from the widget
+        font.setPointSize(14)                  # increase font size to 14pt for better readability because the default is tiny
+        self.setFont(font)                     # apply the larger font to the entire widget and all children
+        
+        # store the main layout for switching between views
+        self.main_layout = QVBoxLayout()       # create a vertical layout that will hold either the table view or description view
+        self.current_view = "table"            # track which view is currently displayed (table or description)
+        self.current_college = None            # store current college name for description view
+        
+        # create the table view
+        self.create_table_view()               # build the initial table view with input and results
+        
+        self.setLayout(self.main_layout)       # set the main layout for the window
+        self.resize(1000, 600)                 # set initial window size to 1000x600 pixels
 
-        top_layout = QHBoxLayout()                                # horizontal layout for input and button
-        self.sat_label = QLabel("what is your sat score?: ")      # label for sat input
-        self.sat_input = QLineEdit()                              # text input for sat score
-        self.sat_input.returnPressed.connect(self.find_colleges)  # connect enter key to search
-        self.find_button = QPushButton("find colleges")           # button to trigger search
-        self.find_button.clicked.connect(self.find_colleges)      # connect button click to search
+    def clear_layout(self, layout):
+        """recursively clear a layout's children (widgets and sub-layouts)."""
+        while layout.count():
+            item = layout.takeAt(0)
+            if item is None:
+                continue
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+            else:
+                child_layout = item.layout()
+                if child_layout is not None:
+                    self.clear_layout(child_layout)
+
+    def create_table_view(self):
+        """create the main table view for college recommendations"""
+        self.clear_layout(self.main_layout)  # clear main layout
+        
+        layout = QVBoxLayout()  # create main vertical layout to arrange widgets top to bottom
+
+        top_layout = QHBoxLayout()                                # create horizontal layout for input controls
+        self.sat_label = QLabel("what is your sat score?: ")      # create label text for sat input
+        self.sat_input = QLineEdit()                              # create text input field for user to enter sat score
+        self.sat_input.returnPressed.connect(self.find_colleges)  # trigger search when user presses enter
+        self.find_button = QPushButton("find colleges")           # create button widget with text
+        self.find_button.clicked.connect(self.find_colleges)      # connect button click signal to search function
         top_layout.addWidget(self.sat_label)                      # add label to horizontal layout
-        top_layout.addWidget(self.sat_input)                      # add input to horizontal layout
+        top_layout.addWidget(self.sat_input)                      # add input field to horizontal layout
         top_layout.addWidget(self.find_button)                    # add button to horizontal layout
-        layout.addLayout(top_layout)                              # add horizontal layout to main vertical layout
+        layout.addLayout(top_layout)                              # add the horizontal layout to the main vertical layout
 
-        self.table = QTableWidget()                                                   # table to display results
-        self.table.setColumnCount(3)                                                  # 3 columns: name, avg sat, acceptance rate
-        self.table.setHorizontalHeaderLabels(["name", "avg sat", "acceptance rate"])  # label the columns
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)       # stretch columns to fit the table width
-        layout.addWidget(self.table)                                                  # add table to main vertical layout
+        self.table = QTableWidget()                                                                     # create table widget to display results
+        self.table.setColumnCount(4)                                                                    # set table to have 4 columns
+        self.table.setHorizontalHeaderLabels(["name", "avg sat", "acceptance rate", "ai description"])  # label each column
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)                         # stretch columns to fit available width
+        layout.addWidget(self.table)                                                                    # add table to main vertical layout
 
-        self.setLayout(layout)
-        self.resize(1000, 600)
+        self.main_layout.addLayout(layout)
+        self.current_view = "table"
+
+    def create_description_view(self, college_name: str):
+        """create a view displaying the college description"""
+        # clear main layout
+        self.clear_layout(self.main_layout)
+        
+        layout = QVBoxLayout()  # create vertical layout for description view
+        
+        # back button at top
+        back_button = QPushButton("back")                  # create button to return to table view
+        back_button.clicked.connect(self.show_table_view)  # connect button to function that shows table
+        layout.addWidget(back_button)                      # add back button to the layout
+        
+        # title
+        title_prefix = "the " if college_name.lower().startswith("university") else ""  # add 'the' if college name starts with 'university'
+        title = QLabel(f"description of {title_prefix}{college_name} using puter ai")   # create title label showing college name
+        title_font = title.font()                                                       # get the default font from the label
+        title_font.setPointSize(16)                                                     # set font size to 16pt for prominent title
+        title_font.setBold(True)                                                        # make the title bold for emphasis
+        title.setFont(title_font)                                                       # apply the styled font to the title label
+        layout.addWidget(title)                                                         # add title label to the layout
+        
+        # description
+        description = get_college_description(college_name)  # fetch description from puter ai
+        description_label = QLabel(description)              # create label to display the ai-generated description
+        description_label.setWordWrap(True)                  # enable word wrapping so text flows to multiple lines
+        description_label.setStyleSheet("padding: 10px;")    # add padding for readability
+        # increase font size for better readability of ai-generated content
+        desc_font = description_label.font()                 # get the default font from the label
+        desc_font.setPointSize(12)                           # set font size to 12pt for easy reading
+        description_label.setFont(desc_font)                 # apply the larger font to the description
+        layout.addWidget(description_label)                  # add description label to the layout
+        
+        # add stretch to push content to top
+        layout.addStretch()  # add empty space at bottom to keep content aligned to top
+        
+        self.main_layout.addLayout(layout)   # add the description layout to the main window layout
+        self.current_view = "description"    # update current view tracker
+        self.current_college = college_name  # store the college name for reference
+
+    def show_table_view(self):
+        """switch back to the table view"""
+        self.create_table_view()
+        # repopulate the table with the previous search results if available
+        if hasattr(self, 'last_recommended'):
+            self.populate_table(self.last_recommended)
 
     def find_colleges(self):
         # validate user input for sat score
@@ -157,21 +292,34 @@ class CollegeFinder(QWidget):  # this be the main window
         
         # get recommended colleges based on sat score
         recommended = get_recommended_colleges(self.colleges, user_sat_score)
-        self.table.setRowCount(len(recommended))  # set number of rows in table
+        self.last_recommended = recommended  # store for potential return from description view
+        self.populate_table(recommended)
+
+    def populate_table(self, recommended):
+        """populate the table with college data"""
+        self.table.setRowCount(len(recommended))  # set number of rows in table based on recommendation count
 
         # populate table with college data
-        for row, college in enumerate(recommended):
+        for row, college in enumerate(recommended):  # loop through each recommended college
             # create a button for the college name that links to their website
-            name_button = QPushButton(college.name)  # create button with college name
-            name_button.setCursor(Qt.PointingHandCursor)  # change cursor to pointer
-            name_button.setStyleSheet("color: #6699FF; text-decoration: underline; border: none; background: none; padding-left: 5px; text-align: left; font-size: 14pt;")  # style as hyperlink with left alignment and matching font size because the stupid hyperlink style messes up the alignment and size and the color is ugly
-            # create lambda to capture domain in closure
+            name_button = QPushButton(college.name)  # create clickable button with college name
+            name_button.setCursor(Qt.PointingHandCursor)  # change cursor to pointer to indicate clickability
+            # style the button to look like a hyperlink (blue text, underline, no visible button border)
+            name_button.setStyleSheet("color: #6699FF; text-decoration: underline; border: none; background: none; padding-left: 5px; text-align: left; font-size: 14pt;")
+            # create lambda to capture domain in closure so each button has the correct url
             url = f"https://{college.domain}" if college.domain else ""
+            # connect button click to open the url in default browser
             name_button.clicked.connect(lambda checked, u=url: QDesktopServices.openUrl(QUrl(u)) if u else None)
-            self.table.setCellWidget(row, 0, name_button)  # add button to table
+            self.table.setCellWidget(row, 0, name_button)  # add name button to first column
             
-            self.table.setItem(row, 1, QTableWidgetItem(str(college.avg_sat)))  # average sat
-            self.table.setItem(row, 2, QTableWidgetItem(f"{college.acceptance_rate}%"))  # acceptance rate
+            self.table.setItem(row, 1, QTableWidgetItem(str(college.avg_sat)))  # add average sat score to second column
+            self.table.setItem(row, 2, QTableWidgetItem(f"{college.acceptance_rate}%"))  # add acceptance rate to third column
+            
+            # create learn more button to view ai description
+            learn_more_button = QPushButton("learn more")  # create button with text
+            # connect button click to show description view for this college
+            learn_more_button.clicked.connect(lambda checked, name=college.name: self.create_description_view(name))
+            self.table.setCellWidget(row, 3, learn_more_button)  # add learn more button to fourth column
 
 def main():
     app = QApplication(sys.argv)  # create the main qt application object, passing command line arguments
