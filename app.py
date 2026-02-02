@@ -27,7 +27,8 @@ college_descriptions_cache = {}
 puter_client = None
 
 def is_connected(timeout: float = 1.0) -> bool:
-    """return true if the host has network connectivity.
+    """
+    return true if the host has network connectivity.
     uses a short tcp connection to a public dns server. This is fast and doesn't perform dns lookups.
     i thought that making sure the user is online before trying to call the puter ai api would be a good idea.
     got this from https://stackoverflow.com/a/33117579, credit to user 'blhsing'.
