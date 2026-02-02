@@ -1,5 +1,6 @@
 import csv  # for reading the csv file
 import sys  # for accessing system-specific parameters and functions
+import socket  # for checking internet connectivity
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox
@@ -24,6 +25,19 @@ college_descriptions_cache = {}
 
 # global puter ai client (initialized on first use)
 puter_client = None
+
+def is_connected(timeout: float = 1.0) -> bool:
+    """return true if the host has network connectivity.
+    uses a short tcp connection to a public dns server. This is fast and doesn't perform dns lookups.
+    i thought that making sure the user is online before trying to call the puter ai api would be a good idea.
+    got this from https://stackoverflow.com/a/33117579, credit to user 'blhsing'.
+    truth be told, i have no idea how this works.
+    """
+    try:
+        socket.create_connection(("8.8.8.8", 53), timeout=timeout)
+        return True
+    except OSError:
+        return False
 
 def initialize_puter_client():
     """
@@ -235,6 +249,10 @@ class CollegeFinder(QWidget):  # this be the main window
 
     def create_description_view(self, college_name: str):
         """create a view displaying the college description"""
+        # require internet for ai descriptions
+        if not is_connected():
+            QMessageBox.warning(self, "no internet", "AI descriptions require an active internet connection.")
+            return
         # clear main layout
         self.clear_layout(self.main_layout)
         
@@ -317,6 +335,10 @@ class CollegeFinder(QWidget):  # this be the main window
             
             # create learn more button to view ai description
             learn_more_button = QPushButton("learn more")  # create button with text
+            # if there's no internet, disable the ai button and show tooltip
+            if not is_connected():
+                learn_more_button.setEnabled(False)
+                learn_more_button.setToolTip("No internet connection — ai descriptions unavailable")
             # connect button click to show description view for this college
             learn_more_button.clicked.connect(lambda checked, name=college.name: self.create_description_view(name))
             self.table.setCellWidget(row, 3, learn_more_button)  # add learn more button to fourth column
